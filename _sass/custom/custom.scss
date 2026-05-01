@@ -30,6 +30,35 @@
   --code-border:     #30363d;
 }
 
+// ─── Global Defaults ─────────────────────────────────────────────────────────
+html {
+  scroll-behavior: smooth;
+}
+
+::selection {
+  background-color: rgba(0, 201, 167, 0.25);
+  color: var(--text-primary);
+}
+
+// ─── Custom Scrollbar (webkit) ────────────────────────────────────────────────
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+
+  &:hover {
+    background: var(--text-muted);
+  }
+}
+
 // ─── Base / Body ─────────────────────────────────────────────────────────────
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
@@ -120,14 +149,21 @@ body {
 .main-content h3 {
   font-size: 1.1rem;
   font-weight: 600;
-  color: var(--text-secondary) !important;
+  color: var(--text-primary) !important;
   margin-top: 1.75rem;
   margin-bottom: 0.75rem;
+
+  &::before {
+    content: '›› ';
+    color: var(--accent-cyan);
+    font-weight: 400;
+    opacity: 0.6;
+  }
 }
 
 .main-content h4 {
   font-size: 1rem;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--text-secondary) !important;
   margin-top: 1.25rem;
 }
@@ -135,6 +171,12 @@ body {
 .main-content p,
 .main-content li {
   color: var(--text-primary) !important;
+}
+
+// Bold text — slightly brighter so it stands out
+.main-content strong {
+  color: #ffffff !important;
+  font-weight: 600;
 }
 
 .main-content a {
@@ -148,13 +190,57 @@ body {
   }
 }
 
+// ─── Lists ───────────────────────────────────────────────────────────────────
+.main-content ul {
+  list-style: none;
+  padding-left: 1.25rem;
+
+  > li::before {
+    content: '▸';
+    color: var(--accent-cyan);
+    font-size: 0.75rem;
+    margin-left: -1.1rem;
+    margin-right: 0.4rem;
+    vertical-align: middle;
+  }
+}
+
+.main-content ol {
+  padding-left: 1.5rem;
+
+  > li::marker {
+    color: var(--accent-cyan);
+    font-weight: 600;
+    font-size: 0.9em;
+  }
+}
+
+// Checklist items (- [ ] and - [x])
+.main-content ul li input[type="checkbox"] {
+  accent-color: var(--accent-cyan);
+  margin-right: 0.4rem;
+  vertical-align: middle;
+
+  &:checked + * {
+    color: var(--text-muted) !important;
+    text-decoration: line-through;
+  }
+}
+
+// Checklist li should not get the ▸ bullet
+.main-content ul li:has(input[type="checkbox"])::before {
+  content: '' !important;
+  margin: 0 !important;
+}
+
 // ─── Code Blocks ─────────────────────────────────────────────────────────────
 .main-content pre.highlight,
 .main-content div.highlight {
   background-color: var(--code-bg) !important;
   border: 1px solid var(--border-color) !important;
   border-radius: 8px !important;
-  padding: 1.25rem !important;
+  // top padding is 2.5rem to clear the macOS dots (dot top=10px + height 12px = 22px)
+  padding: 2.5rem 1.25rem 1.25rem !important;
   overflow-x: auto;
   position: relative;
 
@@ -167,14 +253,18 @@ body {
     background: #ff5f57;
     box-shadow: 20px 0 0 #febc2e, 40px 0 0 #28c840;
     position: absolute;
-    top: 10px;
-    left: 14px;
+    top: 14px;
+    left: 16px;
   }
 
   code {
     font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace !important;
     font-size: 0.85rem;
     line-height: 1.6;
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    color: var(--text-primary);
   }
 }
 
@@ -188,15 +278,8 @@ body {
   font-size: 0.85em !important;
 }
 
-// Language label on code blocks
-.main-content pre[class*="language-"]::after,
-.main-content div.highlight pre::after {
-  color: var(--text-muted);
-  font-size: 0.7rem;
-  font-family: 'Inter', sans-serif;
-}
-
 // ─── Tables ──────────────────────────────────────────────────────────────────
+// Wrapper for horizontal scroll on mobile
 .main-content table {
   border-collapse: collapse;
   width: 100%;
@@ -205,6 +288,9 @@ body {
   border-radius: 8px;
   overflow: hidden;
   margin: 1.5rem 0;
+  display: block;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 
   thead {
     background-color: var(--bg-tertiary) !important;
@@ -217,6 +303,7 @@ body {
       letter-spacing: 0.05em;
       border-bottom: 2px solid var(--accent-cyan) !important;
       padding: 0.75rem 1rem !important;
+      white-space: nowrap;
     }
   }
 
@@ -226,7 +313,7 @@ body {
       transition: background-color 0.1s ease;
 
       &:last-child { border-bottom: none !important; }
-      &:hover { background-color: rgba(0, 201, 167, 0.04) !important; }
+      &:hover { background-color: rgba(0, 201, 167, 0.05) !important; }
     }
 
     td {
@@ -240,34 +327,142 @@ body {
 // ─── Callout Boxes (Note / Warning / Important) ───────────────────────────────
 .note,
 blockquote {
-  background-color: rgba(88, 166, 255, 0.08) !important;
+  background-color: rgba(88, 166, 255, 0.07) !important;
   border-left: 4px solid var(--accent-blue) !important;
   border-radius: 0 6px 6px 0 !important;
-  padding: 1rem 1.25rem !important;
+  padding: 0.875rem 1.25rem 0.875rem 1rem !important;
   margin: 1.5rem 0 !important;
   color: var(--text-primary) !important;
+  position: relative;
+
+  &::before {
+    content: 'ℹ';
+    position: absolute;
+    left: -0.1rem;
+    top: -0.9rem;
+    background: var(--accent-blue);
+    color: #0d1117;
+    font-size: 0.6rem;
+    font-weight: 700;
+    width: 1.1rem;
+    height: 1.1rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
 
   p { color: var(--text-primary) !important; margin: 0; }
 }
 
 .warning {
-  background-color: rgba(240, 180, 41, 0.08) !important;
+  background-color: rgba(240, 180, 41, 0.07) !important;
   border-left: 4px solid var(--accent-yellow) !important;
   border-radius: 0 6px 6px 0 !important;
-  padding: 1rem 1.25rem !important;
+  padding: 0.875rem 1.25rem 0.875rem 1rem !important;
   margin: 1.5rem 0 !important;
+  position: relative;
+
+  &::before {
+    content: '⚠';
+    position: absolute;
+    left: -0.1rem;
+    top: -0.9rem;
+    background: var(--accent-yellow);
+    color: #0d1117;
+    font-size: 0.6rem;
+    font-weight: 700;
+    width: 1.1rem;
+    height: 1.1rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
 
   p { color: var(--text-primary) !important; margin: 0; }
 }
 
 .important {
-  background-color: rgba(255, 123, 123, 0.08) !important;
+  background-color: rgba(255, 123, 123, 0.07) !important;
   border-left: 4px solid var(--accent-red) !important;
   border-radius: 0 6px 6px 0 !important;
-  padding: 1rem 1.25rem !important;
+  padding: 0.875rem 1.25rem 0.875rem 1rem !important;
   margin: 1.5rem 0 !important;
+  position: relative;
+
+  &::before {
+    content: '!';
+    position: absolute;
+    left: -0.1rem;
+    top: -0.9rem;
+    background: var(--accent-red);
+    color: #0d1117;
+    font-size: 0.65rem;
+    font-weight: 800;
+    width: 1.1rem;
+    height: 1.1rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
 
   p { color: var(--text-primary) !important; margin: 0; }
+}
+
+// ─── TOC (Table of Contents) ─────────────────────────────────────────────────
+details {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 2rem;
+
+  > summary {
+    cursor: pointer;
+    color: var(--accent-cyan) !important;
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 0.25rem 0;
+    user-select: none;
+    list-style: none;
+
+    &::-webkit-details-marker { display: none; }
+
+    &::after {
+      content: ' ▾';
+      opacity: 0.6;
+    }
+  }
+
+  &[open] > summary::after {
+    content: ' ▴';
+  }
+
+  ol {
+    margin: 0.75rem 0 0.25rem;
+    padding-left: 1.25rem;
+
+    li {
+      font-size: 0.875rem;
+      margin: 0.2rem 0;
+
+      a {
+        color: var(--text-secondary) !important;
+        border-bottom: none !important;
+
+        &:hover {
+          color: var(--accent-cyan) !important;
+        }
+      }
+    }
+  }
 }
 
 // ─── Labels / Badges ─────────────────────────────────────────────────────────
@@ -296,6 +491,18 @@ blockquote {
   background-color: rgba(255, 123, 123, 0.12) !important;
   color: var(--accent-red) !important;
   border: 1px solid rgba(255, 123, 123, 0.3) !important;
+}
+
+.label-blue {
+  background-color: rgba(88, 166, 255, 0.12) !important;
+  color: var(--accent-blue) !important;
+  border: 1px solid rgba(88, 166, 255, 0.3) !important;
+}
+
+.label-purple {
+  background-color: rgba(188, 140, 255, 0.12) !important;
+  color: var(--accent-purple) !important;
+  border: 1px solid rgba(188, 140, 255, 0.3) !important;
 }
 
 // ─── Buttons ─────────────────────────────────────────────────────────────────
@@ -343,6 +550,7 @@ blockquote {
   &:focus {
     border-color: var(--accent-cyan) !important;
     box-shadow: 0 0 0 3px rgba(0, 201, 167, 0.15) !important;
+    outline: none;
   }
 
   &::placeholder {
@@ -389,18 +597,6 @@ blockquote {
   border-top: 1px solid var(--border-color) !important;
   background-color: var(--bg-secondary) !important;
   font-size: 0.8rem;
-}
-
-// ─── TOC (Table of Contents) ─────────────────────────────────────────────────
-details > summary {
-  cursor: pointer;
-  color: var(--accent-cyan) !important;
-  font-weight: 600;
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding: 0.5rem 0;
-  user-select: none;
 }
 
 // ─── Horizontal Rule ─────────────────────────────────────────────────────────
@@ -452,17 +648,27 @@ details > summary {
 @media (max-width: 800px) {
   .main-content h1 { font-size: 1.6rem; }
   .main-content h2 { font-size: 1.2rem; }
+  .main-content h3 { font-size: 1rem; }
+
+  .main-content pre.highlight,
+  .main-content div.highlight {
+    border-radius: 6px !important;
+    font-size: 0.8rem;
+  }
 }
 
 // ─── Syntax Highlight Overrides (Rouge / GitHub Dark) ────────────────────────
 .highlight {
-  .k, .kd, .kn, .kp, .kr, .kt { color: #ff7b7b; }      // keywords
-  .s, .s1, .s2, .sb, .sc, .sd { color: #79c0ff; }       // strings
-  .c, .c1, .cm, .cs             { color: #8b949e; font-style: italic; } // comments
-  .n, .na, .nb, .nc, .nd       { color: #e6edf3; }      // names
-  .nf, .nx                      { color: #d2a8ff; }      // functions
-  .m, .mi, .mf, .mh, .mo       { color: #f0b429; }      // numbers
-  .o, .ow                       { color: #00c9a7; }      // operators
-  .p                            { color: #e6edf3; }      // punctuation
-  .nt                           { color: #7ee787; }      // HTML tags
+  .k, .kd, .kn, .kp, .kr, .kt { color: #ff7b7b; }       // keywords
+  .s, .s1, .s2, .sb, .sc, .sd { color: #79c0ff; }        // strings
+  .c, .c1, .cm, .cs            { color: #6e7681; font-style: italic; } // comments
+  .n, .na, .nb, .nc, .nd      { color: #e6edf3; }        // names
+  .nf, .nx                     { color: #d2a8ff; }        // functions
+  .m, .mi, .mf, .mh, .mo      { color: #f0b429; }        // numbers
+  .o, .ow                      { color: #00c9a7; }        // operators
+  .p                           { color: #e6edf3; }        // punctuation
+  .nt                          { color: #7ee787; }        // HTML/XML tags
+  .gi                          { color: #56d364; }        // diff added
+  .gd                          { color: #ff7b7b; }        // diff deleted
+  .gh, .gu                     { color: #bc8cff; font-weight: 600; } // diff headings
 }
