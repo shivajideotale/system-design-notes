@@ -237,6 +237,79 @@ TCP Connection
 
 **Still has a problem:** TCP HoL blocking. A lost TCP packet blocks ALL streams while waiting for retransmission — even streams that have no data in the lost packet.
 
+### HTTP/2 on Mobile Networks
+
+HTTP/2's multiplexing, designed to improve performance, actually makes things **worse** on mobile networks compared to HTTP/1.1.
+
+**Why mobile networks are lossy:**
+
+| Network Type | Typical Packet Loss Rate |
+|:------------|:------------------------|
+| Fiber/LAN | <0.01% |
+| Broadband | 0.01–0.1% |
+| LTE (good signal) | 0.5–2% |
+| LTE (weak signal / handoff) | 2–10% |
+| Switching towers (handoff) | 5–30% burst |
+
+**The multiplexing paradox — HTTP/1.1 vs HTTP/2 on lossy connections:**
+
+```
+HTTP/1.1 with domain sharding (6 parallel TCP connections):
+┌─────────────────────────────────────────┐
+│ Connection 1: stream A  ← packet lost   │ ← only this connection stalls
+│ Connection 2: stream B  ← OK            │ ← continues normally
+│ Connection 3: stream C  ← OK            │ ← continues normally
+│ Connection 4: stream D  ← OK            │ ← continues normally
+│ Connection 5: stream E  ← OK            │ ← continues normally
+│ Connection 6: stream F  ← OK            │ ← continues normally
+└─────────────────────────────────────────┘
+Impact: 1/6 of streams blocked
+
+HTTP/2 with a single TCP connection:
+┌─────────────────────────────────────────┐
+│ Stream 1: /api/users                    │
+│ Stream 3: /api/posts   ← packet lost   │ ← triggers TCP HoL blocking
+│ Stream 5: /static/app.js               │
+│ Stream 7: /static/css                  │
+└─────────────────────────────────────────┘
+Impact: ALL 4 streams stall until the lost packet is retransmitted
+```
+
+**TCP retransmission timeline on mobile:**
+
+```
+t=0ms:  Server sends packet #1000 (belongs to Stream 3)
+t=5ms:  Packet #1000 lost in transit (cell tower handoff)
+t=5ms:  Streams 1, 5, 7 data arrives, but TCP buffer holds it —
+        cannot deliver out-of-order data to HTTP/2
+t=205ms: Retransmission timeout fires (RTO ≈ 200ms typical)
+t=205ms: Packet #1000 retransmitted
+t=210ms: Packet #1000 received — TCP can now deliver buffered data
+t=210ms: All streams unblock simultaneously
+
+Total stall: 205ms for a single dropped packet
+```
+
+**Why this is worse than HTTP/1.1 on mobile:**
+
+HTTP/1.1's 6 parallel connections mean each stream is independent at the TCP layer. A dropped packet in connection 1 only delays that connection's stream — the other 5 connections keep flowing. HTTP/2's single-connection design concentrates all traffic, making any TCP-level loss a global stall.
+
+**The more streams, the worse the problem:**
+
+```
+On a page with 50 resources on a 1% loss connection:
+  HTTP/1.1: ~8–9 stall events, each affecting 1/6 of streams
+  HTTP/2:   ~50 stall events (more streams = more packets = more chances),
+            each affecting ALL streams
+```
+
+This is why HTTP/3 (QUIC) was designed — it moves to UDP and implements per-stream reliability, so a lost packet for Stream 3 only stalls Stream 3.
+
+**Interview callout — when HTTP/2 is worse than HTTP/1.1:**
+- High packet loss networks (mobile, satellite, long-distance WAN)
+- Many small resources (more packets = more loss opportunities)
+- Streams with vastly different sizes (one slow/lossy stream stalls all fast ones)
+
 ### HTTP/3 (QUIC)
 
 Released 2022 (RFC 9114). Built on QUIC (UDP-based transport).

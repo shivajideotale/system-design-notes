@@ -279,14 +279,17 @@ body {
 }
 
 // ─── Tables ──────────────────────────────────────────────────────────────────
-// Wrapper for horizontal scroll on mobile
+// border-collapse: separate + border-spacing: 0 lets border-radius work on
+// the table element and on corner cells. overflow: hidden cannot coexist with
+// overflow-x: auto (the auto overrides hidden), so we use cell-level radius
+// on the four corner cells to clip the thead/tbody backgrounds instead.
 .main-content table {
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   width: 100%;
   background-color: var(--bg-secondary) !important;
   border: 1px solid var(--border-color) !important;
   border-radius: 8px;
-  overflow: hidden;
   margin: 1.5rem 0;
   display: block;
   overflow-x: auto;
@@ -304,15 +307,16 @@ body {
       border-bottom: 2px solid var(--accent-cyan) !important;
       padding: 0.75rem 1rem !important;
       white-space: nowrap;
+
+      &:first-child { border-radius: 7px 0 0 0; }
+      &:last-child  { border-radius: 0 7px 0 0; }
     }
   }
 
   tbody {
     tr {
-      border-bottom: 1px solid var(--border-color) !important;
       transition: background-color 0.1s ease;
 
-      &:last-child { border-bottom: none !important; }
       &:hover { background-color: rgba(0, 201, 167, 0.05) !important; }
     }
 
@@ -320,6 +324,14 @@ body {
       color: var(--text-primary) !important;
       padding: 0.65rem 1rem !important;
       vertical-align: top;
+      border-bottom: 1px solid var(--border-color) !important;
+    }
+
+    tr:last-child td {
+      border-bottom: none !important;
+
+      &:first-child { border-radius: 0 0 0 7px; }
+      &:last-child  { border-radius: 0 0 7px 0; }
     }
   }
 }
