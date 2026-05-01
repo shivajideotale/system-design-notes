@@ -279,31 +279,21 @@ Random writes to a B-Tree require random disk I/O (update in place). On HDD, ran
 
 **Core idea: Convert random writes to sequential writes.**
 
-```
-Write path:
-  1. Write to in-memory MemTable (sorted, e.g., skip list)
-  2. When MemTable is full → flush to disk as an immutable SSTable file
-  3. Background compaction merges SSTables, removes deletes (tombstones)
-
-Read path:
-  1. Check MemTable (newest data)
-  2. Check L0 SSTables (most recent flushes, can have overlaps)
-  3. Check L1, L2... (larger, sorted, non-overlapping)
-  4. Use Bloom filter per SSTable to skip files that don't have the key
-```
-
-### LSM Level Structure
-
-```
-MemTable (in memory, mutable)
-    ↓ (flush when full)
-L0: SSTable-1  SSTable-2  SSTable-3  (may overlap)
-    ↓ (compaction when L0 has too many)
-L1: Sorted, non-overlapping SSTables (10× larger than L0)
-    ↓
-L2: (10× larger than L1)
-    ↓
-L3: (10× larger than L2)
+```mermaid
+flowchart TD
+    subgraph wp [Write Path]
+        W[Write] --> Mem[MemTable\nin-memory skip list]
+        Mem -->|full: flush| L0[L0 SSTables\nmay overlap]
+        L0 -->|compaction| L1[L1 — sorted · non-overlapping\n10× L0]
+        L1 -->|compaction| L2[L2\n10× L1]
+        L2 -->|compaction| L3[L3\n10× L2]
+    end
+    subgraph rp [Read Path]
+        R[Read] --> BF{Bloom filter\nper SSTable}
+        BF -->|may exist| CMem[Check MemTable]
+        BF -->|definitely absent| Skip[Skip SSTable ✓]
+        CMem -->|miss| CL0[L0 → L1 → L2 → L3]
+    end
 ```
 
 ### Write Amplification vs Read Amplification

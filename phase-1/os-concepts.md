@@ -51,18 +51,32 @@ nav_order: 2
 
 **Virtual Thread model:** Many-to-many. Millions of virtual threads multiplexed over a small pool of OS carrier threads.
 
-```
-Virtual Thread 1 ──┐
-Virtual Thread 2 ──┼── [Carrier Thread Pool (CPU count)] ── OS
-Virtual Thread 3 ──┘
-...
-Virtual Thread 1M ─/
+```mermaid
+flowchart LR
+    VT1[Virtual Thread 1]
+    VT2[Virtual Thread 2]
+    VT3[Virtual Thread 3]
+    VTN[Virtual Thread 1M]
+    CP["Carrier Thread Pool\n#40;CPU-count OS threads#41;"]
+    OS[OS / Hardware]
+    VT1 & VT2 & VT3 & VTN --> CP --> OS
 ```
 
 **When a virtual thread blocks on I/O:**
-1. JVM unmounts it from the carrier thread
-2. Carrier thread picks up another runnable virtual thread
-3. When I/O completes, virtual thread is rescheduled
+```mermaid
+sequenceDiagram
+    participant VT1 as Virtual Thread 1
+    participant CT as Carrier Thread
+    participant VT2 as Virtual Thread 2
+    participant IO as I/O (DB / network)
+    VT1->>CT: mounted — running
+    CT->>IO: blocking call
+    Note over VT1,CT: JVM detects block → VT1 unmounted
+    CT-->>VT2: picks up VT2
+    VT2->>CT: mounted — running
+    IO-->>VT1: I/O complete
+    Note over VT1: rescheduled on next free carrier
+```
 
 ```java
 // Java 21: Each request on its own virtual thread
@@ -193,14 +207,13 @@ SocketChannel sc = ssc.accept(); // returns null immediately if no connection
 - `epoll_wait()` returns only the ready FDs — O(1) for the wait
 - No FD limit (beyond system limits)
 
-```
-Application registers FDs with epoll
-          ↓
-epoll_wait() → blocks until some FDs are ready
-          ↓
-Application reads ONLY the ready FDs
-          ↓
-repeat
+```mermaid
+flowchart TD
+    App[Application] -->|register FDs once| EP[epoll instance\nin kernel]
+    App -->|epoll_wait| Wait[Block until\nsome FDs ready — O1]
+    Wait -->|returns only ready FDs| Read[Read ONLY\nready FDs]
+    Read --> Wait
+    FDs["Thousands of sockets\n#40;file descriptors#41;"] --> EP
 ```
 
 **This is how Nginx, Node.js (libuv), Netty, and Java NIO Selector work.**
@@ -305,9 +318,14 @@ The kernel caches disk reads in RAM (page cache). On subsequent reads, data come
 2. Consumer reads are often served from page cache (no disk I/O)
 3. `sendfile()` syscall: OS transfers data from page cache to network socket **without copying to userspace** (zero-copy)
 
-```
-Producer → [Kafka Broker] → page cache → sequential disk write
-Consumer → [Kafka Broker] → page cache → sendfile() → network
+```mermaid
+flowchart LR
+    Prod[Producer] -->|write| Broker[Kafka Broker]
+    Broker -->|OS buffers| PC[Page Cache\nRAM]
+    PC -->|async flush| Disk[(Disk — sequential)]
+    Cons[Consumer] -->|read| Broker
+    Broker -->|zero-copy sendfile| PC
+    PC -->|kernel → NIC\nno userspace copy| Net[Network]
 ```
 
 ### B-Trees and inodes

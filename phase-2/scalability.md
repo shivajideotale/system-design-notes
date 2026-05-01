@@ -63,9 +63,19 @@ Before:              After:
 The most common obstacle to horizontal scaling is session state.
 
 **Problem:**
-```
-User logs in → hits Server 1 → session stored in Server 1 memory
-Next request → routed to Server 2 → user appears logged out
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant LB as Load Balancer
+    participant S1 as Server 1
+    participant S2 as Server 2
+    U->>LB: Login request
+    LB->>S1: Route to Server 1
+    S1->>S1: Session stored in memory
+    S1->>U: Logged in ✓
+    U->>LB: Next request
+    LB->>S2: Route to Server 2
+    S2->>U: ✗ No session — appears logged out
 ```
 
 **Solutions:**
@@ -261,14 +271,17 @@ server {
 
 A CDN is a globally distributed network of **Points of Presence (PoPs)** that cache content close to end users.
 
-```
-Without CDN:
-User in Mumbai ──────────────────────────→ Origin in US-East
-                     ~200ms RTT
-
-With CDN:
-User in Mumbai → Mumbai PoP → cache hit → <10ms
-               → cache miss → fetch from origin → cache → serve
+```mermaid
+flowchart LR
+    subgraph without [Without CDN]
+        U1["User\nMumbai"] -->|"~200 ms RTT"| O1["Origin\nUS-East"]
+    end
+    subgraph with [With CDN]
+        U2["User\nMumbai"] --> PoP["CDN PoP\nMumbai"]
+        PoP -->|"cache hit < 10 ms"| U2
+        PoP -->|cache miss| O2["Origin\nUS-East"]
+        O2 -->|cache + serve| PoP
+    end
 ```
 
 ### What CDN Caches

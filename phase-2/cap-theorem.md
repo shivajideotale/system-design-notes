@@ -50,18 +50,15 @@ Therefore, the real choice is: **during a network partition, do you prefer CP or
 
 ### CP vs AP: The Trade-off
 
-```
-Network partition occurs between Node 1 and Node 2:
-
-CP choice:
-  Node 2 cannot confirm its data is up-to-date
-  → Node 2 returns error (or refuses to serve)
-  → Consistent, but Node 2 is unavailable
-  
-AP choice:
-  Node 2 serves its stale data anyway
-  → Client gets old value
-  → Available, but data may be inconsistent
+```mermaid
+flowchart TD
+    P[Network Partition Occurs] --> Choice{CP or AP?}
+    Choice -->|CP| CP[Node 2 refuses to serve\navoid returning stale data]
+    Choice -->|AP| AP[Node 2 serves stale data\nclient gets old value]
+    CP --> CPr[✓ Consistent\n✗ Node 2 unavailable]
+    AP --> APr[✓ Available\n✗ Data may be inconsistent]
+    CPr --> CPex["ZooKeeper · etcd\nMySQL primary"]
+    APr --> APex["Cassandra · DynamoDB default\nRiak · CouchDB"]
 ```
 
 {: .important }
@@ -73,12 +70,15 @@ The CAP theorem only describes what happens **during a partition**. When the net
 
 **PACELC (Abadi, 2012)** extends CAP by noting that **even without a partition**, a distributed system faces a trade-off between **latency and consistency**.
 
-```
-PACELC:
-  IF Partition:
-    Choose: Availability (A) or Consistency (C)
-  ELSE (no partition):
-    Choose: Latency (L) or Consistency (C)
+```mermaid
+flowchart TD
+    Start[Distributed System] --> PQ{Partition?}
+    PQ -->|Yes| AC{Choose}
+    PQ -->|No — normal ops| LC{Choose}
+    AC -->|A| Avail[Availability\nserve possibly stale data]
+    AC -->|C| Cons[Consistency\nrefuse if uncertain]
+    LC -->|L| Lat[Latency\nfaster reads, may be stale]
+    LC -->|C| Cons2[Consistency\nslower but correct reads]
 ```
 
 This is more realistic. The Cassandra vs Zookeeper decision isn't just about partition behavior — it's about whether you want millisecond-latency stale reads (Cassandra) or slightly slower consistent reads (Zookeeper) **all the time**, not just during failures.
@@ -104,10 +104,19 @@ This is more realistic. The Cassandra vs Zookeeper decision isn't just about par
 
 CAP's "C" is linearizability — the strongest model. Real systems offer a spectrum.
 
+```mermaid
+flowchart LR
+    E[Eventual] --> Ca[Causal]
+    Ca --> RYW[Read-Your-Writes]
+    RYW --> Seq[Sequential]
+    Seq --> Lin[Linearizable]
+    style E fill:#1c2128,color:#8b949e
+    style Ca fill:#1c2128,color:#8b949e
+    style RYW fill:#1c2128,color:#f0b429
+    style Seq fill:#1c2128,color:#58a6ff
+    style Lin fill:#1c2128,color:#00c9a7
 ```
-← Weakest                                          Strongest →
-Eventual → Causal → Read-Your-Writes → Sequential → Linearizable
-```
+**← Weakest** (high availability, low latency) &nbsp;→&nbsp; **Strongest** (high consistency, higher latency)
 
 ### Eventual Consistency
 

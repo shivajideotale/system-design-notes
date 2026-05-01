@@ -63,12 +63,11 @@ Burst: 89 requests arrive instantly:
 
 **Concept:** Requests enter a queue (the "bucket"). The queue drains at a fixed rate regardless of input rate. If the queue is full, new requests are rejected.
 
-```
-Input (bursty):  ████████████ ████
-Queue (FIFO):    [ req1 req2 req3 ]
-Output (smooth): drains at constant rate
-
-Result: smooth output rate even for bursty input
+```mermaid
+flowchart LR
+    Burst["Bursty Input\n████████████"] --> Q["Queue FIFO\nreq1 req2 req3 ..."]
+    Q -->|drain at fixed rate| Out["Smooth Output\nconstant rate"]
+    Full["Queue full"] -->|new arrivals| Rej["REJECT 429"]
 ```
 
 **Key property: shapes traffic to a constant output rate.** Unlike token bucket, burst requests are smoothed out — they queue rather than being immediately served.
@@ -96,11 +95,13 @@ Counter: 0
 
 **Critical flaw: boundary burst problem.**
 
-```
-09:00:55 – 09:01:05:
-  Last 5 seconds of window 1: 100 requests (allowed)
-  First 5 seconds of window 2: 100 requests (allowed)
-  = 200 requests in 10 seconds — double the intended limit
+```mermaid
+flowchart LR
+    W1["Window 1\n09:00 – 09:01\n100 req allowed ✓"]
+    W2["Window 2\n09:01 – 09:02\n100 req allowed ✓"]
+    Burst["200 requests\nin 10 seconds\n= 2× intended limit ✗"]
+    W1 -->|last 5 s: 100 req| Burst
+    W2 -->|first 5 s: 100 req| Burst
 ```
 
 **Pros:** Simple. O(1) space and time.  
@@ -383,16 +384,14 @@ public class ApiController {
 
 ## Where to Place the Rate Limiter
 
-```
-Client
-  ↓
-API Gateway (Kong, AWS API Gateway)   ← Best for: per-API-key, coarse limits
-  ↓
-Load Balancer / Reverse Proxy (Nginx) ← Best for: per-IP, DDoS protection
-  ↓
-Application Service                   ← Best for: per-user, business logic limits
-  ↓
-Downstream Service                    ← Best for: self-protection against overload
+```mermaid
+flowchart TD
+    Client[Client]
+    GW["API Gateway\nKong · AWS API GW\nper-API-key coarse limits"]
+    LB["Load Balancer / Nginx\nper-IP · DDoS protection"]
+    App["Application Service\nper-user · business logic"]
+    DS["Downstream Service\nself-protection from overload"]
+    Client --> GW --> LB --> App --> DS
 ```
 
 **API Gateway level (recommended for most cases):**

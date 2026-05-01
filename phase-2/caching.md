@@ -23,20 +23,24 @@ Caching is the single most impactful tool for improving system performance. It e
 
 Every layer of a system can cache. Understanding where to cache what is the architectural decision.
 
-```
-Browser Cache
-    ↓ (miss)
-CDN Edge Cache
-    ↓ (miss)
-API Gateway Cache
-    ↓ (miss)
-Application L1 Cache (in-process: Caffeine)
-    ↓ (miss)
-Application L2 Cache (distributed: Redis)
-    ↓ (miss)
-Database Query Cache (deprecated in MySQL 8.0+)
-    ↓ (miss)
-Database → Disk
+```mermaid
+flowchart TD
+    Req[Incoming Request]
+    BC["Browser Cache\n0 ms"]
+    CDN["CDN Edge Cache\nCloudflare · Fastly · 5–50 ms"]
+    GW["API Gateway Cache\nKong · AWS API GW · 1–5 ms"]
+    L1["App L1 — Caffeine\nin-JVM · 0.1–1 ms"]
+    L2["App L2 — Redis\ndistributed · 1–5 ms"]
+    DB[("Database\nBuffer Pool · 0.1 ms")]
+    Disk[("Disk")]
+
+    Req --> BC
+    BC -->|miss| CDN
+    CDN -->|miss| GW
+    GW -->|miss| L1
+    L1 -->|miss| L2
+    L2 -->|miss| DB
+    DB --> Disk
 ```
 
 | Layer | Technology | Latency | Scope |
@@ -59,16 +63,19 @@ In interviews, when asked "how do you improve read performance?", walk through t
 
 The application is responsible for loading data into the cache on a miss. Most common pattern.
 
-```
-Read path:
-  1. Check cache for key K
-  2. Cache hit  → return value
-  3. Cache miss → query DB → write result to cache → return value
-
-Write path:
-  1. Write to DB
-  2. Invalidate (delete) the cache key
-  (NOT update — avoids race conditions)
+```mermaid
+flowchart TD
+    subgraph rp [Read Path]
+        R[Read Request] --> CC{Cache hit?}
+        CC -->|Hit| Ret[Return cached value]
+        CC -->|Miss| QDB[Query Database]
+        QDB --> WC[Write to cache + TTL]
+        WC --> Ret
+    end
+    subgraph wp [Write Path]
+        W[Write Request] --> WDB[Write to Database]
+        WDB --> INV[Invalidate cache key\nNOT update — avoids race conditions]
+    end
 ```
 
 ```java
@@ -495,12 +502,13 @@ public class ProductService {
 
 ### Two-Tier Caching: L1 (Caffeine) + L2 (Redis)
 
-```
-Request → L1 (Caffeine, in-JVM)
-           ↓ miss
-         L2 (Redis, distributed)
-           ↓ miss
-         Database
+```mermaid
+flowchart TD
+    Req[Request] --> L1["L1 — Caffeine\nin-JVM · ~0.1 ms"]
+    L1 -->|miss| L2["L2 — Redis\ndistributed · ~2 ms"]
+    L2 -->|miss, also backfills L1| DB[(Database)]
+    L1 -->|hit| Ret1[Return]
+    L2 -->|hit, backfill L1| Ret2[Return]
 ```
 
 ```java

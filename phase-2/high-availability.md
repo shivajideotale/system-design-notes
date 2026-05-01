@@ -40,13 +40,13 @@ Replication maintains **copies of data on multiple nodes** to handle node failur
 
 One node accepts writes (primary), others replicate and accept reads (replicas).
 
-```
-Write:   Client → Primary (write committed)
-                     ↓ replicate (async)
-Replica 1         Replica 2
-
-Read:    Client → Replica (stale by replication lag)
-      or Client → Primary (always fresh)
+```mermaid
+flowchart LR
+    C1[Client] -->|write| P[(Primary)]
+    P -->|async replicate| R1[(Replica 1)]
+    P -->|async replicate| R2[(Replica 2)]
+    C2[Client] -->|read — may be stale| R1
+    C3[Client] -->|read — always fresh| P
 ```
 
 **Replication lag:** The time between a write on the primary and it being visible on replicas. Usually milliseconds, but can grow to seconds under high load.
@@ -135,15 +135,18 @@ What happens when the primary fails?
 
 One node is active; the standby is ready but idle (or only receives replication).
 
-```
-Normal:   Client → Primary (handles all traffic)
-                       ↓ replication
-                    Standby (idle, receiving data)
-
-Failure:  Primary dies
-          Standby detected by monitoring
-          Standby promoted → becomes new Primary
-          Clients reconnect (DNS TTL update or VIP failover)
+```mermaid
+flowchart LR
+    subgraph normal [Normal]
+        direction LR
+        C1[Client] --> P1[(Primary\nall traffic)]
+        P1 -->|replication| S1[(Standby\nidle)]
+    end
+    subgraph fail [After Failure]
+        direction LR
+        C2[Client] -->|reconnects| S2[(Standby\npromoted)]
+        P2[(Primary\n✗ dead)] -.->|detected| S2
+    end
 ```
 
 **RTO (Recovery Time Objective):** Time to detect failure + promote standby + clients reconnect. Typically 30 seconds to 2 minutes.
@@ -178,16 +181,18 @@ Without a circuit breaker, one slow downstream service causes cascading failures
 
 **States:**
 
-```
-CLOSED → normal operation, requests flow through
-         ↓ error rate exceeds threshold
-OPEN   → fail fast, return error immediately (no downstream call)
-         ↓ after timeout (e.g., 30 seconds)
-HALF-OPEN → allow one test request through
-         ↓ test request succeeds
-CLOSED → resume normal operation
-         ↓ test request fails
-OPEN   → back to open state
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> CLOSED
+    CLOSED --> OPEN : error rate > threshold
+    OPEN --> HALF_OPEN : timeout expires (30 s)
+    HALF_OPEN --> CLOSED : test request succeeds
+    HALF_OPEN --> OPEN : test request fails
+
+    CLOSED : CLOSED\nRequests flow normally
+    OPEN : OPEN\nFail fast — skip downstream
+    HALF_OPEN : HALF-OPEN\nAllow one probe request
 ```
 
 ### Resilience4j in Spring Boot

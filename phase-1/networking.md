@@ -24,22 +24,26 @@ nav_order: 1
 **What:** Connection-oriented, reliable, ordered byte stream.
 
 **How it works — 3-Way Handshake:**
-```
-Client                    Server
-  |------- SYN --------->|
-  |<------ SYN-ACK ------|
-  |------- ACK --------->|
-  |==== data flows =====>|
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant S as Server
+    C->>S: SYN
+    S->>C: SYN-ACK
+    C->>S: ACK
+    Note over C,S: Connection established — data flows
 ```
 
 **Connection Teardown (4-Way):**
-```
-Client                    Server
-  |------- FIN --------->|   (Client done sending)
-  |<------ ACK ----------|
-  |<------ FIN ----------|   (Server done sending)
-  |------- ACK --------->|
-  [TIME_WAIT: 2×MSL = ~120s]
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant S as Server
+    C->>S: FIN (client done sending)
+    S->>C: ACK
+    S->>C: FIN (server done sending)
+    C->>S: ACK
+    Note over C: TIME_WAIT: 2×MSL ≈ 120 s
 ```
 
 {: .important }
@@ -346,20 +350,16 @@ Root Nameservers (13 clusters worldwide)
 
 ### Resolution Flow
 
-```
-Browser → OS resolver → Recursive Resolver (ISP/8.8.8.8)
-                              |
-                    [Cache hit? Return immediately]
-                              |
-                    Root NS: "Ask .com TLD NS"
-                              |
-                    .com TLD NS: "Ask ns1.example.com"
-                              |
-                    Authoritative NS: "api.example.com → 1.2.3.4"
-                              |
-                    Return A record with TTL
-                              |
-                    Browser → 1.2.3.4 → HTTP request
+```mermaid
+flowchart TD
+    Browser --> OS[OS Resolver]
+    OS --> Rec["Recursive Resolver\nISP / 8.8.8.8"]
+    Rec -->|cache hit| Ret[Return A record + TTL]
+    Rec -->|cache miss| Root["Root NS\n'Ask .com TLD NS'"]
+    Root --> TLD[".com TLD NS\n'Ask ns1.example.com'"]
+    TLD --> Auth["Authoritative NS\napi.example.com → 1.2.3.4"]
+    Auth --> Ret
+    Ret --> Browser2[Browser → 1.2.3.4 → HTTP request]
 ```
 
 ### DNS Record Types
@@ -455,15 +455,16 @@ Both client AND server present certificates. Used for:
 **Full-duplex** persistent connection over a single TCP connection. Upgraded from HTTP/1.1.
 
 **Handshake:**
-```
-GET /ws HTTP/1.1
-Upgrade: websocket
-Connection: Upgrade
-Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==
-
-HTTP/1.1 101 Switching Protocols
-Upgrade: websocket
-Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant S as Server
+    C->>S: GET /ws HTTP/1.1\nUpgrade: websocket\nSec-WebSocket-Key: ...
+    S->>C: 101 Switching Protocols\nUpgrade: websocket
+    Note over C,S: Full-duplex channel open
+    C->>S: Frame (client message)
+    S->>C: Frame (server push)
+    S->>C: Frame (server push)
 ```
 
 **Use when:** Bidirectional, low-latency: chat, gaming, collaboration tools, live dashboards.
