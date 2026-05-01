@@ -342,7 +342,7 @@ blockquote {
   background-color: rgba(88, 166, 255, 0.07) !important;
   border-left: 4px solid var(--accent-blue) !important;
   border-radius: 0 6px 6px 0 !important;
-  padding: 0.875rem 1.25rem 0.875rem 1rem !important;
+  padding: 0.875rem 1.25rem 0.875rem 2.5rem !important;
   margin: 1.5rem 0 !important;
   color: var(--text-primary) !important;
   position: relative;
@@ -350,11 +350,11 @@ blockquote {
   &::before {
     content: 'ℹ';
     position: absolute;
-    left: -0.1rem;
-    top: -0.9rem;
+    left: 0.7rem;
+    top: 0.875rem;
     background: var(--accent-blue);
     color: #0d1117;
-    font-size: 0.6rem;
+    font-size: 0.65rem;
     font-weight: 700;
     width: 1.1rem;
     height: 1.1rem;
@@ -372,18 +372,18 @@ blockquote {
   background-color: rgba(240, 180, 41, 0.07) !important;
   border-left: 4px solid var(--accent-yellow) !important;
   border-radius: 0 6px 6px 0 !important;
-  padding: 0.875rem 1.25rem 0.875rem 1rem !important;
+  padding: 0.875rem 1.25rem 0.875rem 2.5rem !important;
   margin: 1.5rem 0 !important;
   position: relative;
 
   &::before {
     content: '⚠';
     position: absolute;
-    left: -0.1rem;
-    top: -0.9rem;
+    left: 0.7rem;
+    top: 0.875rem;
     background: var(--accent-yellow);
     color: #0d1117;
-    font-size: 0.6rem;
+    font-size: 0.65rem;
     font-weight: 700;
     width: 1.1rem;
     height: 1.1rem;
@@ -401,18 +401,18 @@ blockquote {
   background-color: rgba(255, 123, 123, 0.07) !important;
   border-left: 4px solid var(--accent-red) !important;
   border-radius: 0 6px 6px 0 !important;
-  padding: 0.875rem 1.25rem 0.875rem 1rem !important;
+  padding: 0.875rem 1.25rem 0.875rem 2.5rem !important;
   margin: 1.5rem 0 !important;
   position: relative;
 
   &::before {
     content: '!';
     position: absolute;
-    left: -0.1rem;
-    top: -0.9rem;
+    left: 0.7rem;
+    top: 0.875rem;
     background: var(--accent-red);
     color: #0d1117;
-    font-size: 0.65rem;
+    font-size: 0.75rem;
     font-weight: 800;
     width: 1.1rem;
     height: 1.1rem;
