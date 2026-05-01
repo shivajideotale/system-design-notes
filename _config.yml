@@ -26,6 +26,7 @@ search_enabled: true
 
 mermaid:
   version: "10.9.0"
+  theme: "dark"
 
 aux_links:
   "GitHub":

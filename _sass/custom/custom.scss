@@ -630,16 +630,253 @@ details {
   }
 }
 
-// ─── Mermaid Diagrams ────────────────────────────────────────────────────────
+// ─── Mermaid Diagrams ─────────────────────────────────────────────────────────
 .mermaid {
   background-color: var(--bg-secondary) !important;
   border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 1.5rem;
+  margin: 1.5rem 0;
+  overflow-x: auto;
   text-align: center;
 
+  // ── SVG canvas ──────────────────────────────────────────────────────────────
   svg {
     max-width: 100%;
+    background-color: var(--bg-secondary) !important;
+  }
+
+  // SVG root background rect (Mermaid renders one as the canvas)
+  svg > rect:first-child {
+    fill: var(--bg-secondary) !important;
+  }
+
+  // All SVG text defaults (overridden per-type below)
+  text, tspan {
+    fill: var(--text-primary) !important;
+    font-family: 'Inter', -apple-system, sans-serif !important;
+  }
+
+  // ── Flowchart — nodes ────────────────────────────────────────────────────────
+  .node rect,
+  .node circle,
+  .node ellipse,
+  .node polygon,
+  .node path {
+    fill: var(--bg-card) !important;
+    stroke: var(--accent-cyan) !important;
+    stroke-width: 1.5px !important;
+  }
+
+  // Node HTML labels (Mermaid v10 puts labels in foreignObject > div)
+  .node .label div,
+  .node .label span,
+  .node .label p,
+  .nodeLabel {
+    color: var(--text-primary) !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 0.85rem !important;
+    background: transparent !important;
+    line-height: 1.45 !important;
+  }
+
+  // ── Flowchart — edges & arrows ───────────────────────────────────────────────
+  .flowchart-link,
+  .edgePath path {
+    stroke: var(--accent-cyan) !important;
+    stroke-width: 1.5px !important;
+    fill: none !important;
+  }
+
+  marker path,
+  .marker {
+    fill: var(--accent-cyan) !important;
+    stroke: var(--accent-cyan) !important;
+  }
+
+  // ── Flowchart — edge labels ──────────────────────────────────────────────────
+  .edgeLabel rect,
+  .edgeLabel .label {
+    fill: var(--bg-secondary) !important;
+    background-color: var(--bg-secondary) !important;
+  }
+
+  .edgeLabel span,
+  .edgeLabel div,
+  .edgeLabel p {
+    color: var(--text-secondary) !important;
+    background: var(--bg-secondary) !important;
+    font-size: 0.78rem !important;
+  }
+
+  // ── Flowchart — subgraphs (clusters) ────────────────────────────────────────
+  .cluster rect {
+    fill: rgba(28, 33, 40, 0.55) !important;
+    stroke: var(--border-color) !important;
+    stroke-width: 1px !important;
+    stroke-dasharray: 5 3 !important;
+  }
+
+  .cluster .label div,
+  .cluster .label span {
+    color: var(--accent-cyan) !important;
+    font-size: 0.72rem !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.07em !important;
+    background: transparent !important;
+  }
+
+  // ── Sequence diagrams — actors ───────────────────────────────────────────────
+  .actor {
+    fill: var(--bg-card) !important;
+    stroke: var(--accent-cyan) !important;
+    stroke-width: 1.5px !important;
+  }
+
+  text.actor {
+    fill: var(--text-primary) !important;
+    font-weight: 500 !important;
+    font-size: 0.85rem !important;
+  }
+
+  // ── Sequence diagrams — lifelines ────────────────────────────────────────────
+  line.actor-line {
+    stroke: var(--border-color) !important;
+    stroke-width: 1px !important;
+    stroke-dasharray: 4 3 !important;
+  }
+
+  // ── Sequence diagrams — messages ─────────────────────────────────────────────
+  .messageLine0 {
+    stroke: var(--accent-cyan) !important;
+    stroke-width: 1.5px !important;
+  }
+
+  .messageLine1 {
+    stroke: var(--text-muted) !important;
+    stroke-width: 1.5px !important;
+    stroke-dasharray: 5 3 !important;
+  }
+
+  text.messageText {
+    fill: var(--text-primary) !important;
+    font-size: 0.8rem !important;
+  }
+
+  #arrowhead path,
+  .arrowMarkerPath {
+    fill: var(--accent-cyan) !important;
+    stroke: var(--accent-cyan) !important;
+  }
+
+  // ── Sequence diagrams — activation bars ─────────────────────────────────────
+  .activation0 {
+    fill: rgba(0, 201, 167, 0.12) !important;
+    stroke: var(--accent-cyan) !important;
+    stroke-width: 1px !important;
+  }
+
+  .activation1 {
+    fill: rgba(88, 166, 255, 0.12) !important;
+    stroke: var(--accent-blue) !important;
+    stroke-width: 1px !important;
+  }
+
+  // ── Sequence diagrams — notes ────────────────────────────────────────────────
+  .note {
+    fill: rgba(88, 166, 255, 0.08) !important;
+    stroke: var(--accent-blue) !important;
+    stroke-width: 1px !important;
+  }
+
+  text.noteText {
+    fill: var(--text-primary) !important;
+    font-size: 0.8rem !important;
+  }
+
+  // ── Sequence diagrams — loop / alt / opt labels ──────────────────────────────
+  .labelBox {
+    fill: var(--bg-tertiary) !important;
+    stroke: var(--border-color) !important;
+  }
+
+  text.labelText {
+    fill: var(--accent-yellow) !important;
+    font-weight: 600 !important;
+    font-size: 0.75rem !important;
+  }
+
+  .loopLine {
+    stroke: var(--border-color) !important;
+    stroke-dasharray: 4 3 !important;
+  }
+
+  // ── State diagrams ───────────────────────────────────────────────────────────
+  g[id^="state"] rect,
+  g[id^="root"] rect {
+    fill: var(--bg-card) !important;
+    stroke: var(--accent-cyan) !important;
+    stroke-width: 1.5px !important;
+  }
+
+  .stateLabel text,
+  g[id^="state"] text {
+    fill: var(--text-primary) !important;
+    font-size: 0.85rem !important;
+  }
+
+  // Divider line inside composite states
+  g[id^="state"] line {
+    stroke: var(--border-color) !important;
+  }
+
+  // Start (filled circle) and end (double-circle) states
+  circle.start-state {
+    fill: var(--accent-cyan) !important;
+    stroke: var(--accent-cyan) !important;
+  }
+
+  circle.end-state-outer {
+    fill: none !important;
+    stroke: var(--accent-cyan) !important;
+    stroke-width: 2px !important;
+  }
+
+  circle.end-state-inner {
+    fill: var(--accent-cyan) !important;
+  }
+
+  // Transition lines and arrowheads
+  .transition path,
+  path.transition {
+    stroke: var(--accent-cyan) !important;
+    fill: none !important;
+    stroke-width: 1.5px !important;
+  }
+
+  .transition marker path {
+    fill: var(--accent-cyan) !important;
+    stroke: none !important;
+  }
+
+  // Transition labels
+  .transitionLabel text,
+  text.transitionLabel {
+    fill: var(--text-secondary) !important;
+    font-size: 0.8rem !important;
+  }
+
+  // ── Responsive ───────────────────────────────────────────────────────────────
+  @media (max-width: 800px) {
+    padding: 0.75rem;
+
+    .nodeLabel,
+    text.messageText,
+    text.actor,
+    .stateLabel text {
+      font-size: 0.75rem !important;
+    }
   }
 }
 
