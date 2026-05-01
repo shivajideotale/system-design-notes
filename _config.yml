@@ -7,7 +7,7 @@ plugins:
   - jekyll-remote-theme
   - jekyll-seo-tag
 
-url: "https://shivadeotale.github.io"
+url: "https://shivajideotale.github.io"
 baseurl: "/system-design-notes"
 
 color_scheme: dark
@@ -18,7 +18,7 @@ mermaid:
 
 aux_links:
   "GitHub":
-    - "https://github.com/shivadeotale/system-design-notes"
+    - "https://github.com/shivajideotale/system-design-notes"
 aux_links_new_tab: true
 
 back_to_top: true
