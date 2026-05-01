@@ -82,14 +82,138 @@ Client                    Server
 
 ## HTTP/1.1 vs HTTP/2 vs HTTP/3
 
+### HTTP/1.0
+
+Released 1996. The first widely-used version.
+
+**Key characteristics:**
+- **One request per TCP connection** — a new TCP 3-way handshake for every single resource
+- **No persistent connections** — connection closed immediately after each response
+- **No virtual hosting** — no `Host` header, so one IP = one website
+- **No chunked transfer** — full `Content-Length` required before sending; couldn't stream responses
+
+**Request/Response model:**
+```
+Client                          Server
+  |--- TCP SYN ----------------->|
+  |<-- TCP SYN-ACK ---------------|
+  |--- TCP ACK ----------------->|   ← 1 RTT to establish connection
+  |                               |
+  |--- GET /index.html ---------->|
+  |<-- 200 OK (HTML) -------------|   ← 1 RTT for request + response
+  |--- TCP FIN ----------------->|   ← connection closed
+  |                               |
+  |--- TCP SYN ----------------->|   ← NEW connection for next resource!
+  |<-- TCP SYN-ACK ---------------|
+  |--- TCP ACK ----------------->|   ← 1 RTT wasted again
+  |--- GET /style.css ----------->|
+  |<-- 200 OK (CSS) --------------|
+  |--- TCP FIN ----------------->|
+```
+
+**Cost on a 100-asset page:** 100 TCP handshakes × 1 RTT = 100 extra RTTs just for connection setup.
+
 ### HTTP/1.1
 
-- **One request per TCP connection** (unless pipelining, which has HoL blocking)
-- **Keep-Alive** introduced persistent connections but browsers open 6 connections/host as workaround
-- **Head-of-Line Blocking:** First request blocks subsequent ones on same connection
-- Text-based headers (repeated on every request = wasteful)
+Released 1997. Dramatically improved HTTP/1.0 but still has fundamental limitations.
 
-**Problem:** A page with 100 assets required either 100 sequential requests or 6×100/6 ≈ 17 rounds, each with full headers.
+**What it added over HTTP/1.0:**
+
+**1. Persistent connections (`Keep-Alive`) — default on**
+
+The same TCP connection is reused for multiple requests. Eliminates per-request handshake overhead.
+
+```
+Client                          Server
+  |--- TCP SYN ----------------->|
+  |<-- TCP SYN-ACK ---------------|
+  |--- TCP ACK ----------------->|   ← 1 RTT (once per connection)
+  |                               |
+  |--- GET /index.html ---------->|
+  |<-- 200 OK (HTML) -------------|   ← request 1
+  |--- GET /style.css ----------->|
+  |<-- 200 OK (CSS) --------------|   ← request 2 (same connection!)
+  |--- GET /app.js ------------->|
+  |<-- 200 OK (JS) --------------|   ← request 3
+```
+
+**2. Chunked Transfer Encoding**
+
+Server can start sending before it knows the total size. Critical for streaming responses.
+
+```
+HTTP/1.1 200 OK
+Transfer-Encoding: chunked
+
+1a\r\n                    ← chunk size in hex (26 bytes)
+This is the first chunk\r\n
+d\r\n                     ← next chunk (13 bytes)
+Second chunk!\r\n
+0\r\n                     ← zero-length chunk = end of body
+\r\n
+```
+
+**3. `Host` header — mandatory**
+
+Enables virtual hosting: one IP can serve multiple domains.
+
+```
+GET /path HTTP/1.1
+Host: api.example.com      ← server uses this to route to the right site
+```
+
+**4. Pipelining (theoretical)**
+
+Client sends multiple requests without waiting for responses. Responses must come back in the same order.
+
+```
+Client → GET /a
+Client → GET /b         ← sent without waiting for /a response
+Client → GET /c
+
+Server → Response /a    ← must respond in order
+Server → Response /b
+Server → Response /c
+```
+
+**Problem: Head-of-Line (HoL) blocking** — if `/a` is slow (large file, DB query), `/b` and `/c` wait even if they're ready. In practice, pipelining was disabled in most browsers due to this.
+
+**The real workaround — domain sharding:**
+
+Browsers open **6 parallel TCP connections per hostname**. Developers spread assets across subdomains (`cdn1.example.com`, `cdn2.example.com`) to get 12–18 parallel connections. A hack on top of a hack.
+
+**HTTP/1.1 request/response format:**
+
+```
+GET /api/users HTTP/1.1
+Host: api.example.com
+User-Agent: Mozilla/5.0 (Windows NT 10.0) Chrome/120.0
+Accept: application/json
+Accept-Language: en-US,en;q=0.9
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...   ← repeated on EVERY request!
+Cookie: session_id=abc123; preferences=dark       ← repeated on EVERY request!
+
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+Content-Length: 342
+Cache-Control: max-age=60
+Date: Thu, 01 May 2026 12:00:00 GMT
+
+{"users": [...]}
+```
+
+**Fundamental HTTP/1.1 problems:**
+
+| Problem | Root Cause | Scale Impact |
+|:--------|:-----------|:-------------|
+| HoL blocking | Sequential responses on one connection | Slow resources stall fast ones |
+| Redundant headers | No compression, stateless text protocol | +400–800 bytes overhead per request |
+| Domain sharding workaround | Need multiple TCP connections | Multiple handshakes, no prioritization |
+| No server push | Request-response only | Client must discover sub-resources |
+
+**Problem:** A page with 100 assets required either 100 sequential requests or 6×100/6 ≈ 17 rounds per connection, each with full uncompressed headers repeated verbatim.
 
 ### HTTP/2
 
