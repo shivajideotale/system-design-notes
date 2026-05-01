@@ -1,0 +1,40 @@
+title: "System Design Notes"
+description: "A comprehensive system design knowledge base — 15 years of Java backend experience distilled into architecture mastery."
+
+remote_theme: just-the-docs/just-the-docs@v0.10.0
+
+plugins:
+  - jekyll-remote-theme
+  - jekyll-seo-tag
+
+url: "https://shivadeotale.github.io"
+baseurl: "/system-design-notes"
+
+color_scheme: dark
+search_enabled: true
+
+mermaid:
+  version: "10.9.0"
+
+aux_links:
+  "GitHub":
+    - "https://github.com/shivadeotale/system-design-notes"
+aux_links_new_tab: true
+
+back_to_top: true
+back_to_top_text: "Back to top"
+
+footer_content: "Built for Staff/Principal Engineer preparation &bull; Java Backend &rarr; Architecture Mastery"
+
+heading_anchors: true
+nav_sort: case_insensitive
+
+exclude:
+  - SYSTEM_DESIGN_ROADMAP.md
+  - PROJECT_PLAN.md
+  - Gemfile
+  - Gemfile.lock
+  - "*.gemspec"
+  - ".github"
+  - "node_modules"
+  - "vendor"
