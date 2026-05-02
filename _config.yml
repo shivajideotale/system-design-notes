@@ -10,7 +10,7 @@ plugins:
 url: "https://shivajideotale.github.io"
 baseurl: "/system-design-notes"
 
-color_scheme: dark
+#color_scheme: dark
 callouts_level: quiet
 callouts:
   note:
@@ -26,7 +26,7 @@ search_enabled: true
 
 mermaid:
   version: "10.9.0"
-  theme: "dark"
+  #theme: "dark"
 
 aux_links:
   "GitHub":
