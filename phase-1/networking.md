@@ -813,6 +813,163 @@ NAT allows multiple private IPs to share one public IP. The NAT device maintains
 
 ---
 
+## Unicast, Multicast, and Broadcast
+
+Every packet sent on a network has an addressing mode — it determines how many destinations receive the traffic and how the network delivers it.
+
+### The Four Addressing Modes
+
+| Mode | Sender | Receivers | IP range / address | Scale |
+|:-----|:-------|:----------|:-------------------|:------|
+| **Unicast** | One | One specific host | Any regular IPv4/IPv6 address | 1 copy per receiver |
+| **Broadcast** | One | All hosts on a subnet | `255.255.255.255` or `<subnet>.255` | 1 copy → all on segment |
+| **Multicast** | One | Subscribed group members | `224.0.0.0/4` (IPv4 Class D), `ff00::/8` (IPv6) | 1 copy per network segment |
+| **Anycast** | One | Nearest node advertising the address | Regular IP, multi-site BGP announcement | Routed to geographically closest |
+
+### Unicast
+
+Standard TCP/IP communication — every HTTP request, gRPC call, and database connection is unicast. One source IP, one destination IP.
+
+**Scale implication:** Sending to N receivers requires N independent copies of the data. A video stream delivered to 10,000 viewers via unicast means 10,000 separate TCP streams from the origin. CDNs solve this by terminating unicast streams at edge nodes close to viewers.
+
+### Broadcast
+
+One sender reaches every host on the same Layer 2 segment (broadcast domain). Routers do not forward broadcast traffic between subnets — it stays contained within the local segment.
+
+**Layer 2 broadcast:** Ethernet sends to `FF:FF:FF:FF:FF:FF` — every NIC on the LAN processes the frame.
+
+**Layer 3 broadcast:** IPv4 sends to `255.255.255.255` (limited) or `192.168.1.255` (directed, subnet-scoped).
+
+**IPv6 removes broadcast entirely** — multicast replaces every use case.
+
+**Protocols that rely on broadcast:**
+
+```
+ARP (Address Resolution Protocol):
+  "Who has IP 192.168.1.1? Tell 192.168.1.10"
+  → Sent to FF:FF:FF:FF:FF:FF (all devices on LAN respond if they own that IP)
+
+DHCP Discovery:
+  Client has no IP → sends to 255.255.255.255 → all DHCP servers hear it
+  First server response wins; client sends unicast to accept
+
+NetBIOS Name Resolution (legacy Windows):
+  Broadcast to find hostname → replaced by DNS in modern networks
+```
+
+**Broadcast storms:** A bridging loop causes broadcast frames to circulate forever, each switch forwarding to all ports. Spanning Tree Protocol (STP) breaks loops by blocking redundant paths.
+
+### Multicast
+
+One sender delivers to a **group** of interested receivers. Multicast-aware routers replicate the packet only at branch points in the delivery tree — one copy traverses each network link, regardless of how many receivers are downstream.
+
+```
+                         [Sender]
+                             │ (one stream)
+                         [Router A]
+                        /          \
+                   [Router B]    [Router C]     ← one copy per link
+                  /       \           \
+            [Recv 1]   [Recv 2]    [Recv 3]
+```
+
+**Multicast group management:**
+- **IGMP (IPv4):** Hosts join a group by sending an IGMP `Membership Report` to the router. Leave by sending a `Leave Group` message.
+- **MLD (IPv6):** Equivalent protocol for IPv6 multicast.
+- Routers build a multicast distribution tree using PIM (Protocol Independent Multicast).
+
+**Reserved multicast ranges:**
+
+| Range | Scope | Examples |
+|:------|:------|:---------|
+| `224.0.0.0 – 224.0.0.255` | Link-local (not routed) | `224.0.0.1` all-hosts, `224.0.0.2` all-routers, OSPF hello |
+| `224.0.1.0 – 238.255.255.255` | Globally routable | Registered multicast applications |
+| `239.0.0.0/8` | Administratively scoped (private) | Enterprise-internal multicast |
+
+**System design uses of multicast:**
+
+```
+Financial market data feeds:
+  NYSE, NASDAQ distribute real-time price feeds via multicast UDP.
+  One feed → thousands of trading floor subscribers.
+  Unicast alternative would require the exchange to maintain thousands of TCP connections.
+
+Cluster heartbeat protocols:
+  Corosync (Linux HA cluster) sends heartbeats to 239.x.x.x multicast group.
+  All cluster nodes subscribe; only one heartbeat packet per interval regardless of cluster size.
+
+mDNS / Zeroconf (service discovery on local networks):
+  Apple Bonjour, Kubernetes with mDNS resolvers use 224.0.0.251:5353.
+  "Who is printer.local?" → multicast query → printer responds with unicast.
+
+SSDP (Simple Service Discovery Protocol):
+  UPnP devices announce themselves to 239.255.255.250.
+  Smart TVs, routers, and IoT devices use this for auto-discovery.
+```
+
+**Multicast in Java (UDP multicast socket):**
+
+```java
+// Sender: publish a heartbeat to a multicast group
+try (MulticastSocket socket = new MulticastSocket()) {
+    InetAddress group = InetAddress.getByName("239.1.2.3");
+    byte[] data = "heartbeat:node-1".getBytes(StandardCharsets.UTF_8);
+    DatagramPacket packet = new DatagramPacket(data, data.length, group, 5000);
+    socket.send(packet);
+}
+
+// Receiver: subscribe to the multicast group
+try (MulticastSocket socket = new MulticastSocket(5000)) {
+    InetAddress group = InetAddress.getByName("239.1.2.3");
+    socket.joinGroup(group);   // sends IGMP Membership Report to router
+
+    byte[] buffer = new byte[256];
+    DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+    socket.receive(packet);    // blocks until a multicast packet arrives
+    System.out.println(new String(packet.getData(), 0, packet.getLength()));
+
+    socket.leaveGroup(group);  // sends IGMP Leave Group
+}
+```
+
+### Anycast
+
+The same IP address is announced from multiple geographic locations via BGP. Each router on the internet directs packets to the *topologically nearest* announcement. Anycast is not a separate IP range — it is a routing strategy applied to ordinary unicast addresses.
+
+```
+Cloudflare's 1.1.1.1 is announced from 300+ PoPs worldwide.
+A user in Tokyo resolves 1.1.1.1 → BGP routes to Tokyo PoP.
+A user in London resolves 1.1.1.1 → BGP routes to London PoP.
+Same destination IP, completely different physical servers.
+```
+
+**Use cases:**
+
+| Service | Why anycast |
+|:--------|:-----------|
+| DNS (1.1.1.1, 8.8.8.8) | Nearest resolver = lowest query latency |
+| CDN edge nodes | Nearest PoP serves cached content |
+| DDoS mitigation | Attack traffic absorbed by closest scrubbing center |
+| NTP (time.cloudflare.com) | Nearest time server = lowest sync latency |
+
+**Anycast vs Unicast load balancing:** Unicast load balancing is explicit (send to LB VIP, LB routes to backend). Anycast load balancing is implicit (BGP routes to nearest PoP, no LB required for geographic distribution).
+
+### Addressing Mode Summary for System Design
+
+| Decision | Guidance |
+|:---------|:---------|
+| API calls, database connections | Always unicast |
+| Service discovery on a local subnet | Multicast (mDNS) or unicast with a registry |
+| Real-time market data to many consumers | Multicast UDP (one sender, N receivers, efficient) |
+| CDN / global DNS / DDoS scrubbing | Anycast via BGP |
+| DHCP, ARP | Broadcast (protocol-mandated; no alternative) |
+| Video to millions of viewers | Unicast via CDN edge (public internet doesn't route multicast) |
+
+{: .note }
+**Multicast on the public internet:** ISPs generally do not support multicast routing between ASes (Autonomous Systems). Multicast is reliable within a single datacenter or enterprise network. Internet-scale "multicast" (live video, CDN) is implemented as unicast to CDN edge nodes, which then unicast to end users.
+
+---
+
 ## Key Takeaways for Interviews
 
 1. **TCP trade-off:** Reliability costs latency. When designing real-time systems, UDP (or QUIC) may be better.
@@ -821,6 +978,8 @@ NAT allows multiple private IPs to share one public IP. The NAT device maintains
 4. **TLS 1.3 = 1-RTT** — essential for global services. Always enable OCSP stapling.
 5. **WebSocket** for bidirectional; **SSE** for server-push over HTTP/2; **Long Polling** when WebSocket isn't available.
 6. **L7 LB** for HTTP routing; **L4 LB** for non-HTTP or when latency is critical.
+7. **Multicast is efficient for many-receivers, same-data** — but only within a datacenter or enterprise. Public internet video "multicast" is actually CDN unicast at scale.
+8. **Anycast is geographic load balancing via BGP** — no application-level routing required. DNS resolvers and CDN PoPs use it to route to the nearest server transparently.
 
 ---
 
@@ -829,4 +988,5 @@ NAT allows multiple private IPs to share one public IP. The NAT device maintains
 - [Cloudflare: How HTTP/3 works](https://blog.cloudflare.com/http3-the-past-present-and-future/)
 - [High Performance Browser Networking](https://hpbn.co/) — Ilya Grigorik (free online)
 - [RFC 9114](https://www.rfc-editor.org/rfc/rfc9114) — HTTP/3
+- [RFC 1112](https://www.rfc-editor.org/rfc/rfc1112) — IGMP: Host Extensions for IP Multicasting
 - *Computer Networks* — Andrew Tanenbaum (Chapter 6–7)
