@@ -392,7 +392,7 @@ dev.example.com zone (managed by dev team — separate zone):
   prod.dev.example.com    → A 10.0.1.3
 ```
 
-### Zone File Structure
+#### Zone File Structure
 
 Every zone has a **SOA (Start of Authority)** record that carries metadata, followed by resource records.
 
@@ -425,7 +425,7 @@ dev  IN NS  ns1.dev.example.com.
 dev  IN NS  ns2.dev.example.com.
 ```
 
-### Zone Types
+#### Zone Types
 
 | Type | Description |
 |:-----|:------------|
@@ -434,7 +434,7 @@ dev  IN NS  ns2.dev.example.com.
 | **Stub** | Holds only NS records of a delegated child zone |
 | **Forward** | Not authoritative — forwards queries upstream |
 
-### Zone Transfer (AXFR / IXFR)
+#### Zone Transfer (AXFR / IXFR)
 
 Secondary nameservers replicate the zone from the primary:
 
@@ -454,7 +454,7 @@ Primary can also push proactively via DNS NOTIFY (RFC 1996)
 {: .warning }
 **Zone transfer security:** An unrestricted AXFR hands an attacker a complete map of every hostname in your zone. Always restrict with `allow-transfer { secondary-ip; }` or the equivalent in your DNS provider's ACL settings.
 
-### Zone Delegation
+#### Zone Delegation
 
 ```mermaid
 flowchart TD
@@ -473,7 +473,7 @@ flowchart TD
 
 The parent zone's only responsibility is to hold NS records pointing to the child zone's nameservers — it stores no records *from* the child zone.
 
-### Split-Horizon DNS
+#### Split-Horizon DNS
 
 Return different IP addresses for the same hostname depending on the source of the query. This avoids hairpin NAT and keeps internal traffic on the internal network.
 
@@ -664,6 +664,39 @@ Client: GET /messages?timeout=30s  ← immediately reconnects
 ## NAT and Load Balancing
 
 ### NAT (Network Address Translation)
+
+#### Why NAT Exists
+
+IPv4 uses 32-bit addresses — a theoretical maximum of ~4.3 billion unique IPs. By the early 1990s it was clear this would run out as the internet scaled. The solution was **RFC 1918 private address space**: three blocks reserved for internal networks that are never routed on the public internet.
+
+| Private range | CIDR | Hosts |
+|:--------------|:-----|:------|
+| `10.0.0.0 – 10.255.255.255` | 10.0.0.0/8 | ~16.7 million |
+| `172.16.0.0 – 172.31.255.255` | 172.16.0.0/12 | ~1 million |
+| `192.168.0.0 – 192.168.255.255` | 192.168.0.0/16 | ~65,000 |
+
+Every home router, corporate network, and cloud VPC uses private IPs internally. NAT is what lets millions of devices behind a single ISP each reach the public internet using just one (or a small pool of) public IPs.
+
+```
+Home network (192.168.1.0/24)          Internet
+  Laptop  192.168.1.10  ─┐
+  Phone   192.168.1.11  ─┤── NAT router (203.0.113.1) ──▶  example.com
+  TV      192.168.1.12  ─┘        (one public IP)
+```
+
+**Without NAT:** each device would need a globally unique public IPv4, which ran out in 2011 (IANA exhaustion). NAT effectively multiplied the usable IPv4 space and delayed IPv6 adoption by decades.
+
+**How NAT works (NAPT — Port Address Translation):**
+
+1. Laptop (`192.168.1.10:54321`) sends a packet to `93.184.216.34:443`.
+2. NAT router rewrites source to `203.0.113.1:41000` and stores the mapping in its connection table.
+3. Response arrives at `203.0.113.1:41000`; router rewrites destination back to `192.168.1.10:54321` and forwards.
+
+```
+Connection table entry:
+  External          ↔  Internal
+  203.0.113.1:41000 ↔  192.168.1.10:54321  (TCP, expires on FIN/RST or timeout)
+```
 
 NAT allows multiple private IPs to share one public IP. The NAT device maintains a **connection table** mapping (private IP:port) → (public IP:port).
 

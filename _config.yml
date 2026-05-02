@@ -50,3 +50,4 @@ exclude:
   - ".github"
   - "node_modules"
   - "vendor"
+  - "CLAUDE.md"
