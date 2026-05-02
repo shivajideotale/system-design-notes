@@ -343,7 +343,9 @@ Modern cloud warehouses have reversed the traditional ETL (Extract-Transform-Loa
 
 ```sql
 -- dbt model: models/marts/revenue_by_category.sql
+{% raw %}
 {{ config(materialized='table', partition_by={'field': 'order_date', 'data_type': 'date'}) }}
+{% endraw %}
 
 SELECT
     d.category,
