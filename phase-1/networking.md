@@ -17,6 +17,72 @@ nav_order: 1
 
 ---
 
+## OSI Model
+
+The OSI (Open Systems Interconnection) model is a conceptual framework that divides network communication into 7 layers. Each layer handles one specific responsibility and communicates only with the layers directly above and below it. In practice the internet uses the 4-layer TCP/IP model — but OSI vocabulary is universal in system design interviews.
+
+### The 7 Layers
+
+| Layer | Name | Responsibility | Protocols / Examples | PDU |
+|:------|:-----|:---------------|:---------------------|:----|
+| 7 | **Application** | User-facing protocols and data formats | HTTP, gRPC, DNS, SMTP, FTP | Message |
+| 6 | **Presentation** | Encoding, encryption, compression | TLS/SSL, JSON, XML, Base64 | Message |
+| 5 | **Session** | Session establishment and maintenance | RPC session management, NetBIOS | Message |
+| 4 | **Transport** | End-to-end delivery, port multiplexing | TCP, UDP, QUIC | Segment |
+| 3 | **Network** | Logical addressing and routing | IP (IPv4/IPv6), ICMP, BGP | Packet |
+| 2 | **Data Link** | Physical addressing, error detection | Ethernet, Wi-Fi (802.11), ARP | Frame |
+| 1 | **Physical** | Bit transmission over a medium | Fiber, coaxial, radio, RJ45 | Bit |
+
+### OSI vs TCP/IP
+
+The internet uses the **TCP/IP model** (4 layers). OSI is a reference model — useful for reasoning, not implementation:
+
+```
+OSI                     TCP/IP
+─────────────────────────────────────────────
+7. Application    ─┐
+6. Presentation   ─┤──  Application  (HTTP, DNS, TLS, gRPC)
+5. Session        ─┘
+4. Transport      ────  Transport    (TCP, UDP, QUIC)
+3. Network        ────  Internet     (IP, ICMP, BGP)
+2. Data Link      ─┐
+1. Physical       ─┘──  Network Access (Ethernet, Wi-Fi)
+```
+
+### How a Packet Flows (Encapsulation)
+
+Data is **encapsulated** going down the stack on the sender and **de-encapsulated** going up on the receiver:
+
+```
+Sender side (going down):
+
+  Application (7):  [ HTTP: GET /api/users ]
+  Transport (4):    [ TCP: src:54321 dst:443 | HTTP ]
+  Network (3):      [ IP: src:1.2.3.4 dst:5.6.7.8 | TCP | HTTP ]
+  Data Link (2):    [ Ethernet: src-MAC dst-MAC | IP | TCP | HTTP | FCS ]
+  Physical (1):     101100100110...  (bits on wire or radio)
+
+Receiver side (going up): each layer strips its own header and passes the payload up.
+```
+
+### Why OSI Matters for System Design
+
+The layer a device operates at determines what it can inspect and act on:
+
+| Device / Component | OSI Layer | Capability |
+|:-------------------|:----------|:-----------|
+| **L4 Load Balancer** (AWS NLB) | Transport (4) | Routes by IP + port only. Cannot see URL or headers. |
+| **L7 Load Balancer** (AWS ALB, Nginx) | Application (7) | Routes by URL path, Host header, cookies. Terminates TLS. |
+| **Stateful Firewall** | Transport (4) | Allows/blocks by IP, port, TCP state. |
+| **WAF** (Web Application Firewall) | Application (7) | Inspects HTTP payload. Blocks SQLi, XSS, CSRF. |
+| **Router** | Network (3) | Forwards packets by IP. Unaware of port or application. |
+| **Switch** | Data Link (2) | Forwards frames by MAC address. Unaware of IP. |
+
+{: .note }
+**Interview shorthand:** L4 = IP + port visibility only; L7 = full HTTP visibility. This distinction drives most load balancer, firewall, and API gateway design decisions.
+
+---
+
 ## TCP vs UDP
 
 ### TCP (Transmission Control Protocol)
@@ -28,9 +94,9 @@ nav_order: 1
 sequenceDiagram
     participant C as Client
     participant S as Server
-    C->>S: SYN
+    C->>S: SYN (Synchronize)
     S->>C: SYN-ACK
-    C->>S: ACK
+    C->>S: ACK (Acknowledgement)
     Note over C,S: Connection established — data flows
 ```
 
@@ -39,10 +105,10 @@ sequenceDiagram
 sequenceDiagram
     participant C as Client
     participant S as Server
-    C->>S: FIN (client done sending)
-    S->>C: ACK
-    S->>C: FIN (server done sending)
-    C->>S: ACK
+    C->>S: FIN (Finish) (client done sending)
+    S->>C: ACK (Acknowledgement)
+    S->>C: FIN (Finish) (server done sending)
+    C->>S: ACK (Acknowledgement)
     Note over C: TIME_WAIT: 2×MSL ≈ 120 s
 ```
 
