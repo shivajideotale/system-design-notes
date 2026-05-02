@@ -375,6 +375,139 @@ flowchart TD
 | **SRV** | Service location (port + host) | Used by Kubernetes, gRPC |
 | **PTR** | Reverse DNS (IP → domain) | Used by email servers |
 
+### DNS Zones
+
+A **DNS zone** is an administrative unit of authority within the DNS namespace. A zone is managed by one or more authoritative nameservers and contains all resource records for that portion of the hierarchy.
+
+**Zone vs Domain:** A domain is a subtree of the DNS namespace (`example.com` and everything under it). A zone is the portion *managed by a specific set of nameservers*. Subdomains can be split off into separate zones, each delegated to a different team or provider.
+
+```
+example.com zone (managed by platform team):
+  example.com          → A 1.2.3.4
+  www.example.com      → A 1.2.3.4
+  api.example.com      → A 1.2.3.5
+
+dev.example.com zone (managed by dev team — separate zone):
+  staging.dev.example.com → A 10.0.1.2
+  prod.dev.example.com    → A 10.0.1.3
+```
+
+### Zone File Structure
+
+Every zone has a **SOA (Start of Authority)** record that carries metadata, followed by resource records.
+
+```
+$ORIGIN example.com.
+$TTL 3600
+
+; SOA — one per zone, defines zone metadata
+@  IN SOA  ns1.example.com. admin.example.com. (
+       2024050101  ; Serial (YYYYMMDDNN) — increment on every change
+       3600        ; Refresh — secondary polls primary every 3600 s
+       900         ; Retry — retry after 900 s if refresh fails
+       604800      ; Expire — secondary stops answering after 7 days
+       300         ; Negative TTL — NXDOMAIN cached for 5 min
+   )
+
+; Authoritative nameservers for this zone
+@    IN NS   ns1.example.com.
+@    IN NS   ns2.example.com.
+
+; A / CNAME / MX records
+@    IN A    1.2.3.4
+www  IN A    1.2.3.4
+api  IN A    1.2.3.5
+cdn  IN CNAME example.cdn-provider.com.
+@    IN MX 10 mail.example.com.
+
+; Delegation — dev subdomain is a separate zone
+dev  IN NS  ns1.dev.example.com.
+dev  IN NS  ns2.dev.example.com.
+```
+
+### Zone Types
+
+| Type | Description |
+|:-----|:------------|
+| **Primary (master)** | Writable, holds the authoritative zone file |
+| **Secondary (slave)** | Read-only replica synced from primary via zone transfer |
+| **Stub** | Holds only NS records of a delegated child zone |
+| **Forward** | Not authoritative — forwards queries upstream |
+
+### Zone Transfer (AXFR / IXFR)
+
+Secondary nameservers replicate the zone from the primary:
+
+- **AXFR** — full zone transfer: sends the entire zone file. Used for initial sync.
+- **IXFR** — incremental transfer: sends only changes since the last known serial. Preferred for large zones.
+
+```
+Secondary polls primary at Refresh interval:
+  Secondary → Primary: SOA query (current serial?)
+  If primary serial > secondary serial:
+    Secondary → Primary: IXFR (give me changes since serial N)
+    Primary  → Secondary: changed/added/deleted records
+
+Primary can also push proactively via DNS NOTIFY (RFC 1996)
+```
+
+{: .warning }
+**Zone transfer security:** An unrestricted AXFR hands an attacker a complete map of every hostname in your zone. Always restrict with `allow-transfer { secondary-ip; }` or the equivalent in your DNS provider's ACL settings.
+
+### Zone Delegation
+
+```mermaid
+flowchart TD
+    ROOT["Root Zone (.)"]
+    COM[".com TLD Zone"]
+    EX["example.com Zone\nns1.example.com · ns2.example.com"]
+    DEV["dev.example.com Zone\nns1.dev.example.com\n(separate team, separate NS)"]
+    API["api.example.com → 1.2.3.5\n(record inside example.com zone)"]
+
+    ROOT -->|"NS delegation"| COM
+    COM  -->|"NS delegation"| EX
+    EX   -->|"NS delegation"| DEV
+    EX   -->|"A record"| API
+    DEV  -->|"A record"| STG["staging.dev.example.com → 10.0.1.2"]
+```
+
+The parent zone's only responsibility is to hold NS records pointing to the child zone's nameservers — it stores no records *from* the child zone.
+
+### Split-Horizon DNS
+
+Return different IP addresses for the same hostname depending on the source of the query. This avoids hairpin NAT and keeps internal traffic on the internal network.
+
+```
+Query for api.example.com from 10.0.0.0/8 (internal):
+  → 10.0.1.5  (private IP — direct path, no LB transit)
+
+Query for api.example.com from external IP:
+  → 1.2.3.5   (public IP — through CDN / load balancer)
+```
+
+```yaml
+# BIND named.conf — two views for the same zone
+view "internal" {
+    match-clients { 10.0.0.0/8; };
+    zone "example.com" {
+        type primary;
+        file "zones/internal/example.com";   # private IPs
+    };
+};
+
+view "external" {
+    match-clients { any; };
+    zone "example.com" {
+        type primary;
+        file "zones/external/example.com";   # public IPs
+    };
+};
+```
+
+**Split-horizon use cases:** Internal service mesh (same hostname, private routing), geo-based routing (return nearest datacenter IP), staging vs production separation under one domain.
+
+---
+
 ### DNS in System Design
 
 **DNS-based load balancing:**
