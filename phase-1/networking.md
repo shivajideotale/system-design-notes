@@ -811,6 +811,74 @@ NAT allows multiple private IPs to share one public IP. The NAT device maintains
 | Consistent Hashing | Hash request key → server ring | Cache affinity, even distribution |
 | Random | Pick randomly | Simple, surprisingly effective |
 
+### Passthrough Mode vs Proxy Mode
+
+These two modes describe **how** the load balancer handles the TCP connection between client and backend — a decision that determines TLS ownership, client IP visibility, and performance characteristics.
+
+#### Proxy Mode (Full Proxy)
+
+The load balancer **terminates** the client TCP connection and opens a separate TCP connection to the backend. It is a man-in-the-middle at the transport level.
+
+```
+Client ──TCP conn 1──▶ [Load Balancer] ──TCP conn 2──▶ Backend
+         (closed here)   terminates TLS     (new TCP)
+                         reads HTTP headers
+                         rewrites Host, adds X-Forwarded-For
+```
+
+- Used by: AWS ALB, Nginx (HTTP mode), HAProxy (HTTP mode), Envoy
+- The LB can decrypt TLS, inspect HTTP headers/cookies/body, inject headers, and re-encrypt (or forward plain HTTP to the backend)
+- Backend sees the LB's IP as the source — the real client IP is passed via `X-Forwarded-For` / `X-Real-IP` header
+- Enables: SSL offloading, path-based routing, A/B testing, WAF integration, session persistence by cookie
+
+#### Passthrough Mode (TCP Passthrough)
+
+The load balancer **forwards raw TCP segments** without terminating the connection. It acts purely at L4, routing by IP + port. The TCP handshake goes end-to-end between client and backend.
+
+```
+Client ──────────────────────────────────────────────▶ Backend
+         TCP handshake passes through the LB unchanged
+         TLS terminated at backend (end-to-end encryption)
+         LB reads only IP header and TCP port
+```
+
+- Used by: AWS NLB (TCP mode), HAProxy (TCP mode), Nginx (stream module)
+- Backend receives the real client IP (no `X-Forwarded-For` needed; use Proxy Protocol for it)
+- TLS is terminated at the backend — the LB never sees the decrypted payload
+- Faster: fewer CPU cycles (no TLS, no HTTP parsing), lower latency
+- **TLS passthrough use case:** regulatory requirement that the LB must not decrypt traffic (PCI-DSS card data, healthcare PHI) — backend holds the private key
+
+#### Direct Server Return (DSR)
+
+A specialized passthrough variant where the **response bypasses the load balancer entirely**. The LB rewrites only the destination MAC address; the backend sends its reply directly to the client using the LB's VIP as the source IP.
+
+```
+Client ──▶ [Load Balancer] ──▶ Backend
+                                  │
+Client ◀───────────────────────────┘  (response bypasses LB)
+```
+
+- Used by: LVS (Linux Virtual Server), HAProxy with DSR, hardware appliances (F5)
+- Eliminates the LB as a bottleneck on the response path — critical when response >> request (video streaming, large file downloads)
+- Requires the backend's loopback interface to be configured with the VIP so it can use it as source IP
+
+#### Comparison
+
+| Dimension | Proxy Mode | Passthrough Mode | DSR |
+|:----------|:-----------|:----------------|:----|
+| TLS termination | At LB (offloaded) | At backend (end-to-end) | At backend |
+| OSI layer | L7 (Application) | L4 (Transport) | L4 |
+| Client IP visibility | Via `X-Forwarded-For` header | Proxy Protocol or real IP | Real IP |
+| HTTP routing (path, header) | ✅ Yes | ❌ No | ❌ No |
+| CPU overhead | Higher (TLS + HTTP parse) | Lower | Lowest |
+| Response path | Through LB | Through LB | Direct to client |
+| AWS equivalent | ALB | NLB | Not natively available |
+
+**Decision rule:**
+- Use **proxy mode** when you need SSL termination, URL routing, header inspection, or WAF.
+- Use **passthrough** when the backend must own TLS (compliance, mTLS), or when you need lowest latency for non-HTTP protocols (MQTT, gRPC with client certs, raw TCP).
+- Use **DSR** when response bandwidth dwarfs request bandwidth and the LB would otherwise be a throughput bottleneck.
+
 ---
 
 ## Unicast, Multicast, and Broadcast
